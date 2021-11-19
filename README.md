@@ -32,7 +32,9 @@ Capabilities:
 - spindle Angular degree with resolution given by the encoder step/turn
 - spindle rpm reading
 
-Detailed instruction and block diagram of the system is available in the PDF documents
+Detailed instructions and block diagram of the system is available in the PDF documents
+
+The code is written in C++ and it's for Arduino UNO only. Arduino IDE is needed to compile and load the sketch on the Arduino UNO board.
 
 Discussion forum available : hhttp://meccanicaedintorni.morpel.it/phpbb/viewtopic.php?f=16&t=15729
 Forum language is italian only. Registration and presentaton are mandatory to post on the forum
