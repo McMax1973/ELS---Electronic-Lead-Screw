@@ -525,7 +525,7 @@ void AvanzamentoVincolato()
   float Current_pos = 0.00;        //Current position of the carriage/cross-slide
   int FeedSpeed = 0;               //feed speed in mm/min
   unsigned int MaxFeed = 0;        //Max Feed speed in mm/min
-  unsigned int MandrelSpeed = 0;   //current speed of the mandrel in RPM; used to calculate teh feedspeed while using cutting velocity in cent/turn
+  unsigned int MandrelSpeed = 0;   //current speed of the mandrel in RPM; used to calculate the feedspeed while using cutting velocity in cent/turn
   unsigned long StepperSpeed;
   unsigned int NORTON_feed;        //current FEED value with 1 turn of screw/Feedbar (cent/turn)
 
@@ -550,7 +550,7 @@ void AvanzamentoVincolato()
   lcd.setCursor(4, 2); lcd.print(buff);
     
   strcpy_P(buff, (char*)pgm_read_word(&(MenuAvanzamento[20]))); lcd.setCursor(12, 2); lcd.print(buff); // RPM
-  strcpy_P(buff, (char*)pgm_read_word(&(MenuAvanzamento[21]))); lcd.setCursor(0, 3);  lcd.print(buff); // SEL:camnbia
+  strcpy_P(buff, (char*)pgm_read_word(&(MenuAvanzamento[21]))); lcd.setCursor(0, 3);  lcd.print(buff); // SEL:cambia
   strcpy_P(buff, (char*)pgm_read_word(&(MenuAvanzamento[10]))); lcd.setCursor(12, 3); lcd.print(buff); // ESC:fine
   strcpy_P(buff, (char*)pgm_read_word(&(MenuAvanzamento[17]))); lcd.setCursor(18, 0); lcd.print(buff); // mm
 
@@ -629,7 +629,7 @@ void AvanzamentoVincolato()
         strcpy_P(buff, (char*)pgm_read_word(&(MenuAvanzamento[11])));   // print SEL:start
         lcd.setCursor(0,3);
         lcd.print(buff);
-        CursorPos = 2;                    //positiooning the cursor on the START selection
+        CursorPos = 2;                    //positioning the cursor on the START selection
         delay(300);
       }
       if (analogRead(ANALOG_Y) < LOW_TOL) {

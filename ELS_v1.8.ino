@@ -1,21 +1,23 @@
 // by McMax
 // ELS - Electronic Lead Screw
-// Firmware V1.6 - 27/11/2019
-// Encoder PULL_UP defined by default
+// Firmware V1.8 - 20/06/2022
+// Encoder PULL_UP configured by default
 
-#include <LiquidCrystal.h>  //include la libreria di controllo del display LCD
-#include <EEPROM.h>         //include la libreria per il controllo della EEPROM
-#include <avr/pgmspace.h>   //include la libreria per l'utilizzo della flash come storage (per le stringhe)
+#include <LiquidCrystal.h>    //include la libreria di controllo del display LCD
+#include <EEPROM.h>           //include la libreria per il controllo della EEPROM
+//#include <YetAnotherPcInt.h>  //include la libreria per l'utilizzo di interrupt su ogni pin (PcInt)
+#include <avr/pgmspace.h>     //include la libreria per l'utilizzo della flash come storage (per le stringhe)
 
-#define firmware_version "  firmware v1.6"
+#define firmware_version "   firmware v1.8"
 
 // Pin assignement
 #define ANALOG_X A0    //ingresso analogico joystick asse X - Sparkfun joystick X
 #define ANALOG_Y A1    //ingresso analogico joystick asse Y - Sparkfun joystick Y
 #define STEP     9     //uscita segnale "STEP" per motore stepper 
-#define DIR      8     //uscita segnale "DIR" per motore stepper 
+#define DIR      8     //uscita segnale "DIR" per motore stepper
+//#define ENCZ     1     //ingresso encoder Z (index) - PCINT17, portD
 #define ENCA     2     //ingresso ancoder A - INTERRUPT 0 
-#define ENCB     3     //ingresso ancoder B - INTERRUPT 0 
+#define ENCB     3     //ingresso ancoder B - INTERRUPT 1 
 #define ENABLE   7     //uscita segnale "ENABLE" per motore stepper
 #define ESC      4     //bottone ESC - Sparkfun D4
 #define SEL      5     //bottone SELECT - Sparkfun D5
@@ -30,6 +32,9 @@
 // END pin assignment 
 
 #define MaxSteps 800   //dimension of the step array - this can be adjusted to increase the maximum pitch according to the available RAM
+                       //this number MUST be lower than the encoder steps per turn
+
+#define PiGreco 3.141592
 
 //Analog Joystick reading tolerance definition
 #define LOW_TOL   450   //minimum tolerance for joystick movement LOW (2.2V on joystic pot cursor)
@@ -51,7 +56,7 @@ LiquidCrystal lcd(LCD_RS, LCD_RW, LCD_EN, LCD_D4, LCD_D5, LCD_D6, LCD_D7); //ini
 
 char buff[21];                    //buffer per memorizzare le stringhe lette dalla flash e visualizzate sul display
 
-boolean mm_min = true;            //variabile che determina la modalita' di avanzamento: true = mm/min; false = cent/giro 
+boolean mm_min = false;            //variabile che determina la modalita' di avanzamento: true = mm/min; false = cent/giro 
 
 unsigned int av_carro[4];         //array da 4 valori che memorizza di avanzamenti dei rapporti norton per il carro caricandoli dalla EEPROM
 unsigned int av_trasv[4];         //array da 4 valori che memorizza di avanzamenti dei rapporti norton per il trasversale caricandoli dalla EEPROM
@@ -62,7 +67,7 @@ int one_turn_mandrel_steps;        //numero di step/giro dell'encoder mandrino (
 float screw_pitch;                          //passo della vite madre in mm (valore caricato da EEPROM)
 
 unsigned int one_turn_screw_steps;          //numero di step/giro del motore stepper sulla vite (valore caricato da EEPROM)
-float single_step_pitch;                    //valore in micron di movimento del carro ad ogni step della vite madre
+float single_step_pitch;                    //valore in mm di movimento del carro ad ogni step della vite madre
                                             //calcolato al termine della funzione LoadFromEEPROM()
 float SingleStepFeed;                       //valore in millimetri di movimento del carro ad ogni step della barra
                                             //calcolato nelle funzioni di avanzamento dove richiesto ed in base alla posizione del cambio norton
@@ -80,31 +85,32 @@ byte sequenza [MaxSteps];              //array usato per i calcolo della sequenz
                                        //max_passo = passo_vite*(800/passi_stepper_giro)
 int numero_passi = 0;                  //variabile che memorizza il numero dei passi stepper per ogni giro mandrino (usata in filettatura e avanzamento)
 int pointer = 0;                       //puntatore per array "sequenza"
-boolean Metric = true;                 //se vero il passo impostato in filettatura e' metrico, se Falso e' imperial
-float thread_pitch = 1.00;                  //passo impostato per la filettatura in mm (standard 1.00mm)
-byte TPI = 20;                              //passo impostato per la filettatura in pollici (standard 20 TPI) 
+byte thread_type = 0;                  //0 = metric thread; 1 = TPI(inch) thread; 2 = Module (mod) thread
+float thread_pitch = 1.00;             //passo impostato per la filettatura in mm (standard 1.00mm)
+byte TPI = 20;                         //passo impostato per la filettatura in pollici (standard 20 TPI)
+float mod_pitch = 1.00;                //passo impostato per la filettatura a modulo (standard 1.00 mod) 
 //fine variabili usate per il calcolo della progressione di filettatura
 
 //variabili relative alla lettura dell'encoder
 int steps = 0;                             //passi encoder relativi - variabile usata come appoggio in filettatura e avanzamento
 volatile long absolute_encoder_steps = 0;  //passi encoder assoluti
-boolean step_flag;                         //Flag per detarminare se il passo encode  avvenuto (usata nella rountine di interrupt di lettura dell'nencoder) 
+boolean step_flag;                         //Flag per detarminare se il passo encoder è avvenuto (usata nella rountine di interrupt di lettura dell'nencoder) 
 int passi_sequenza = 0;
-char encoder[] = {0, 1, -1, 0, -1, 0, 0, 1, 1, 0, 0, -1, 0, -1, 1, 0};  //arrray da 16 valori usato per "muovere" i passi enoder nella rountine interrupt di filettatura
+char encoder[] = {0, 1, -1, 0, -1, 0, 0, 1, 1, 0, 0, -1, 0, -1, 1, 0};  //arrray da 16 valori usato per "muovere" i passi encoder nella rountine interrupt di filettatura
 boolean sviluppo_filetto = true;      //Flag che detrmina il verso id filettatura: TRUE = DESTRO; FALSE = SINISTRO
 //fine variabili relative alla lettura dell'encoder                                     
 
 
 // Stepper motor variables
-boolean CW;                    //TRUE se la rotazione standard della vite e' in senso orario (orario trascina il carro verso il madnrino). variabile letta da EEPROM
+boolean CW;                    //TRUE se la rotazione standard della vite e' in senso orario (orario trascina il carro verso il mandrino). variabile letta da EEPROM
 boolean CCW;                   //TRUE se la rotazione standard della vite e' in senso anti-orario (anti-orario trascina il carro verso il madnrino) variabile letta da EEPROM
 boolean Direction = CW;        //variabile usata per determinare il senso di rotazione momentaneo del motore stepper e incrementare o decrementare i passi
 boolean CarroTrasv = true;     //TRUE = avanzamneto sul carro; FALSE = avanzamento sul trasversale
 int passi_stepper = 0;
-unsigned long Speed;           //memorizza la velocit corrente del motore stepper in giri al minuto - se = 0 lo stepper e' fermo
-unsigned long MaxStepperSpeed; //massima velocit di rotazione ammessa per il motore stepper. Variabile letta da EEPROM
+unsigned long Speed;           //memorizza la velocità corrente del motore stepper in giri al minuto - se = 0 lo stepper e' fermo
+unsigned long MaxStepperSpeed; //massima velocità di rotazione ammessa per il motore stepper. Variabile letta da EEPROM
 
-volatile unsigned int TOP = 65535;        //valore usato per scrivere il registro ICR1 che determina la frequenza del PWM che regola la velocit di rotazione del motore stepper 
+volatile unsigned int TOP = 65535;        //valore usato per scrivere il registro ICR1 che determina la frequenza del PWM che regola la velocità di rotazione del motore stepper 
 volatile long absolute_steps = 0;         //passi stepper assoluti
 unsigned int AccelerationDelay;           //ritardo accelerazione del motore stepper - varibile letta da EEPROM
 unsigned int DecelerationDelay;           //ritardo decelerazione del motore stepper - varibile letta da EEPROM
@@ -165,9 +171,9 @@ void ClearPWM()  //Clear the PWM and stops Timer1
 void SetPWM()    //Sets the PWM and starts Timer1
 {
   ICR1 = 65535;                        //(65535)set TOP at maximum value in order to get minumun frequency on the motor with prescaler clk/64
-  OCR1A = 3;                           // Set OCR1A register to 1 which means that the CLEAR of the OC1A pin is done after 2 timer1 cycle.
-                                       // means 8us with clk/64 prescaler
-  TCCR1A = _BV(COM1A1) | _BV(WGM11);   //OC1A set for PWM with SET at BOTTOM and CLEAR at MATCH (non-inverted mode)
+  OCR1A = 3;                           // Set OCR1A register to 3 which means that the CLEAR of the OC1A pin is done after 3 timer1 ticks.
+                                       // means 12us with clk/64 prescaler
+  TCCR1A = _BV(COM1A1) | _BV(WGM11);   //OC1A (pin 9) set for PWM with SET at BOTTOM and CLEAR at MATCH (non-inverted mode)
   TCCR1B = _BV(WGM13) | _BV(WGM12);    //WGM set for Fast PWM with ICR1 used as TOP value
 
 }
@@ -176,14 +182,14 @@ void SetOneShot()
 {
   ICR1 = 0;                                                 // Set ICR1 register to 0. ICR1 is the TOP of the timer counting which means the timer is stuck to 0
   OCR1A = 65534;                                            // Set OCR1A to 65534 in order to fire a pulse of 2 cycle clock (8us)
-  TCCR1A = _BV(COM1A1) | _BV(COM1A0) | _BV(WGM11);          //OC1A set for PWM with CLEAR at BOTTOM and SET at MATCH (inverted mode)
+  TCCR1A = _BV(COM1A1) | _BV(COM1A0) | _BV(WGM11);          //OC1A (pin 9) set for PWM with CLEAR at BOTTOM and SET at MATCH (inverted mode)
   TCCR1B = _BV(WGM13) | _BV(WGM12) | _BV(CS11) | _BV(CS10); //WGM set for Fast PWM with ICR1 used as TOP value. Prescaler set to clk/64 (4uSec cycle)
                                                             // Timer1 start HERE  
 }
 
 void FireStep()
 {
-  TCNT1 = 65533;                // Force the Time1 value to 65533 in order to hit the MATCH of OCR1A after one clock cycle
+  TCNT1 = 65533;                // Force the Timer1 value to 65533 in order to hit the MATCH of OCR1A after one clock cycle
 }
 
 void StepperMoveToPosition(long absolute_position) //runs the stepper to a specific position without accelerating (this is used for precision positioning only
@@ -200,7 +206,8 @@ void StepperMoveToPosition(long absolute_position) //runs the stepper to a speci
 }
 
 void StepperRunToSpeed(unsigned long Target)    //Runs the stepper to a specific Target speed (in rpm)
-                                                                        //AccelRate is the wait time in usec for acceleration
+                                                //AccelRate is the wait time in usec for acceleration
+                                                //Make sure to call SetPWM() before using this function
 {
   unsigned long CurrentSpeed;
   
@@ -237,12 +244,17 @@ void StepperRunToSpeed(unsigned long Target)    //Runs the stepper to a specific
   }
   
   Speed = Target;
-}                              //END of the Interrupt Service Routine
+}                              
 
 
 
 void setup() 
 {
+  /* // DEBUG
+  Serial.begin(38400);
+  Serial.println("ELS v1.8");
+  Serial.println("debug session");
+  */ //END DEBUG
   lcd.begin(20, 4);
   lcd.print("Electronic LeadScrew");
   lcd.setCursor(9,1);
@@ -251,7 +263,8 @@ void setup()
   lcd.print("McMax");
   lcd.setCursor(0,3);
   lcd.print(firmware_version);
-  delay(3000);
+  delay(2500);
+  //pinMode(ENCZ, INPUT_PULLUP);         //Encoder Z input (index) - software INTERRUPT
   pinMode(ENCA, INPUT_PULLUP);         //Econder A input - INTERRUPT
   pinMode(ENCB, INPUT_PULLUP);         //Encoder B input - INTERRUPT
   pinMode(ESC, INPUT_PULLUP);   //ESC BUTTON (D4 of the sparkfun Joystick shield)

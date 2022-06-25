@@ -1,4 +1,4 @@
-const char MP0[] PROGMEM = "**MENU  PRINCIPALE**";
+const char MP0[] PROGMEM = "* MENU  PRINCIPALE *";
 const char MP1[] PROGMEM = "Impostazioni";
 const char MP2[] PROGMEM = "Avanzamento";
 const char MP3[] PROGMEM = "Filettatura";

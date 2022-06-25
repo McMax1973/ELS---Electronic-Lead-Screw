@@ -26,6 +26,7 @@ Configuration:
 
 Capabilities:
 - threading with metric and imperial pitches (0.1mm to 2x screw pitch, with 0.05mm thread pitch resolution)
+- threading with MODULE pitch (metric only)
 - right-hand or left-hand threading option
 - threading at a given lenght available
 - feeding with cent/turn or mm/min option

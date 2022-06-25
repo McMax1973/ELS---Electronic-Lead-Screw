@@ -16,16 +16,17 @@ const char IMP14[] PROGMEM = "avanzamento trasv 4";
 const char IMP15[] PROGMEM = "offset filetto";
 const char IMP16[] PROGMEM = "NORTON";
 const char IMP17[] PROGMEM = "Vel max stepper";
-const char IMP18[] PROGMEM = "ripristina valori";   //<=== FINE MENU'
-const char IMP19[] PROGMEM = "SEL: OK";
-const char IMP20[] PROGMEM = "ORARIA";              //VALORE PER VOCE IMP[6]
-const char IMP21[] PROGMEM = "ANTI-ORARIA";         //VALORE PER VOCE IMP[6]
+const char IMP18[] PROGMEM = "taratura";
+const char IMP19[] PROGMEM = "ripristina valori";   //<=== FINE MENU'
+const char IMP20[] PROGMEM = "SEL: OK";
+const char IMP21[] PROGMEM = "ORARIA";              //VALORE PER VOCE IMP[6]
+const char IMP22[] PROGMEM = "ANTI-ORARIA";         //VALORE PER VOCE IMP[6]
 
 
 const char* const MenuImpostazioni[] PROGMEM = {IMP0, IMP1, IMP2, IMP3, IMP4, IMP5, IMP6, IMP7, IMP8, IMP9,
                                                 IMP10, IMP11, IMP12, IMP13, IMP14, IMP15, IMP16, IMP17, IMP18,
-                                                IMP19, IMP20, IMP21 };
-                                               
+                                                IMP19, IMP20, IMP21, IMP22 };
+
 
 
 void Impostazioni()
@@ -37,6 +38,7 @@ void Impostazioni()
   boolean ANALOG_X_moved = false;
   boolean ANALOG_Y_moved = false;
   int variation;
+  char avanz = 0;
 
   lcd.clear();
   lcd.setCursor(0, 0);
@@ -63,8 +65,8 @@ void Impostazioni()
       case 3: lcd.print(screw_pitch, 3); break;
       case 4: lcd.print(AccelerationDelay); break;
       case 5: lcd.print(DecelerationDelay); break;
-      case 6: if (CCW) strcpy_P(buff, (char*)pgm_read_word(&(MenuImpostazioni[20])));
-              else    strcpy_P(buff, (char*)pgm_read_word(&(MenuImpostazioni[21]))); 
+      case 6: if (CCW) strcpy_P(buff, (char*)pgm_read_word(&(MenuImpostazioni[21])));
+              else    strcpy_P(buff, (char*)pgm_read_word(&(MenuImpostazioni[22]))); 
               lcd.print(buff); 
               break;
       case 7: lcd.print(av_carro[0]); break;
@@ -78,7 +80,8 @@ void Impostazioni()
       case 15: lcd.print(thread_offset_steps); break;
       case 16: lcd.print(NORTON_gearbox+1); break;
       case 17: lcd.print(MaxStepperSpeed); break;
-      case 18: lcd.print("SEL:ok"); break;
+      case 18: strcpy_P(buff, (char*)pgm_read_word(&(MenuImpostazioni[avanz+7]))); lcd.print(buff); break;
+      case 19: lcd.print("SEL:ok"); break;
     }
     lcd.setCursor(0, 3);
     lcd.print("UP/DW  -  OK  -  ESC");
@@ -90,11 +93,23 @@ void Impostazioni()
       {
         stay = false;
         SEL_pressed = true;
+        lcd.setCursor(10,3);
+        lcd.blink();
+        lcd.cursor();
+        delay(200);
+        lcd.noCursor();
+        lcd.noBlink();
       }
       if (digitalRead(ESC) == PRESSED)
       {
         stay = false;
         ESC_pressed = true;
+        lcd.setCursor(17,3);
+        lcd.blink();
+        lcd.cursor();
+        delay(200);
+        lcd.noCursor();
+        lcd.noBlink();
       }
       if ((analogRead(ANALOG_X) < LOW_3) || (analogRead(ANALOG_X) > HIGH_3)) stay = false;
       if ((analogRead(ANALOG_Y) < LOW_TOL) || (analogRead(ANALOG_Y) > HIGH_TOL)) stay = false;
@@ -114,41 +129,44 @@ void Impostazioni()
     }
     if (SEL_pressed) 
     {
-        if (MenuIndex == 18) 
-        {
-          lcd.setCursor(0,2);
-          lcd.print("CONFERMA RIPRISTINO?");
-          lcd.setCursor(0,3);
-          lcd.print    ("SEL:ok - ESC:annulla");
-          while (stay)
-          {
-            if (digitalRead(ESC) == PRESSED) stay = false;
-            delay(300);
-            if (digitalRead(SEL) == PRESSED)
-            {
-              lcd.setCursor(0,3);
-              lcd.print(".... RIPRISTINO ....");
-              FactoryDefaultEEPROM();
-              LoadFromEEPROM();
-              stay = false;
-              delay(1000);
-            }
-          }
-          stay = true;
+        switch(MenuIndex) {
+          case 18: /*Taratura(avanz);*/lcd.setCursor(0,3); lcd.print("....COMING SOON....."); delay(1000); break;
+          case 19: lcd.setCursor(0,2);
+                   lcd.print("CONFERMA RIPRISTINO?");
+                   lcd.setCursor(0,3);
+                   lcd.print    ("SEL:ok - ESC:annulla");
+                   while (stay)
+                   {
+                     if (digitalRead(ESC) == PRESSED) stay = false;
+                     delay(300);
+                     if (digitalRead(SEL) == PRESSED)
+                     {
+                       lcd.setCursor(0,3);
+                       lcd.print(".... RIPRISTINO ....");
+                       FactoryDefaultEEPROM();
+                       LoadFromEEPROM();
+                       stay = false;
+                       delay(1000);
+                     }
+                   }
+                   stay = true;
+                   break;
+          default: {WriteToEEPROM();LoadFromEEPROM();}
         }
-        else {WriteToEEPROM();LoadFromEEPROM();}
     }
     if (ESC_pressed) stay = false;    
-    if ((analogRead(ANALOG_Y) < LOW_TOL) && (analogRead(ANALOG_Y) > LOW_3)) variation = -5;
-    if (analogRead(ANALOG_Y) <= LOW_3) variation = -50;
-    if ((analogRead(ANALOG_Y) > HIGH_TOL) && (analogRead(ANALOG_Y) < HIGH_3)) variation = 5;
-    if (analogRead(ANALOG_Y) >= HIGH_3) variation = 50;
+    if ((analogRead(ANALOG_Y) < LOW_TOL) && (analogRead(ANALOG_Y) >= LOW_2)) variation = -5;
+    if ((analogRead(ANALOG_Y) < LOW_2) && (analogRead(ANALOG_Y) >= LOW_3)) variation = -50;
+    if (analogRead(ANALOG_Y) < LOW_3) variation = -100;
+    if ((analogRead(ANALOG_Y) > HIGH_TOL) && (analogRead(ANALOG_Y) <= HIGH_2)) variation = 5;
+    if ((analogRead(ANALOG_Y) > HIGH_2) && (analogRead(ANALOG_Y) <= HIGH_3)) variation = 50;
+    if (analogRead(ANALOG_Y) > HIGH_3) variation = 100;
     if (variation != 0)
     {
       switch (MenuIndex) {
         case 1: one_turn_mandrel_steps += variation; break;
         case 2: one_turn_screw_steps += variation; break;
-        case 3: screw_pitch = (((screw_pitch * 1000) + (variation)) / 1000); break;
+        case 3: screw_pitch = (((screw_pitch * 1000) + (variation/5)) / 1000); break;
         case 4: AccelerationDelay += (variation * 5); break;
         case 5: DecelerationDelay += (variation * 5); break;
         case 6: CW = !(CW); CCW = !(CCW); break;
@@ -165,7 +183,8 @@ void Impostazioni()
                  if (NORTON_gearbox > 200 ) NORTON_gearbox = 0;
                  if (NORTON_gearbox > 3) NORTON_gearbox = 3;
                  break;  
-        case 17: MaxStepperSpeed += variation;        
+        case 17: MaxStepperSpeed += variation; break;
+        case 18: avanz += (variation/variation); if (avanz == 8) avanz = 0; if (avanz == -1) avanz = 7; break;      
       }
     }
     delay(200);
