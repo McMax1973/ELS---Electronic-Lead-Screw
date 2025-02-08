@@ -37,5 +37,5 @@ Detailed instructions and block diagram of the system is available in the PDF do
 
 The code is written in C++ and it's for Arduino UNO only. Arduino IDE is needed to compile and load the sketch on the Arduino UNO board.
 
-Discussion forum available : http://meccanicaedintorni.morpel.it/phpbb/viewtopic.php?f=16&t=29866
+Discussion forum available : https://meccanicaedintorni.net/viewtopic.php?t=29866
 Forum language is italian only. Registration and presentaton are mandatory to post on the forum
